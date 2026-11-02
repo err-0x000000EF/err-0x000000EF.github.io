@@ -22,7 +22,8 @@ body{min-height:100svh;min-height:100dvh}
 .article-body .code-block pre .line{display:inline}
 .article-body .mermaid{margin:24px 0;padding:18px;border:1px solid #385044;border-radius:9px;background:#16251f;text-align:center;overflow:auto}
 .article-body .mermaid svg{max-width:100%;height:auto}
-.article-body .mermaid-gantt svg{max-width:none;width:1800px;min-width:1100px;height:auto}
+.article-body .mermaid-gantt{ text-align:left }
+.article-body .mermaid-gantt svg{display:block;max-width:none!important;width:auto!important;min-width:0;height:auto;margin-inline:auto}
 .article-body .mermaid svg .nodeLabel,.article-body .mermaid svg .mindmap-node-label,.article-body .mermaid svg foreignObject div,.article-body .mermaid svg foreignObject span{color:#f7f5ec!important;fill:#f7f5ec!important;background-color:transparent!important}
 .article-body .mermaid svg .mindmap-node-label p{color:#f7f5ec!important}
 .article-body .component-card{display:block;border:1px solid #446453;border-radius:9px;padding:16px 18px;margin:20px 0;background:#1b2c24;color:#e8eee8}

@@ -255,23 +255,40 @@ document.addEventListener("DOMContentLoaded", () => {
           cScale9: "#4f746d", cScaleLabel9: "#fffdf2", cScale10: "#80565e", cScaleLabel10: "#fffdf2",
           cScale11: "#6d784f", cScaleLabel11: "#fffdf2"
           };
-          mermaid.initialize({
-            startOnLoad: false,
-            securityLevel: "strict",
-            theme: "base",
-            themeVariables: palette,
-            // Daily ticks collide on multi-week charts. Weekly ticks keep labels legible;
-            // the chart container remains horizontally scrollable for long timelines.
-            gantt: { tickInterval: "1week", axisFormat: "%b %d", useWidth: 1800 }
-          });
+          const estimateGanttWidth = (source) => {
+            const dates = [...source.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)]
+              .map((match) => Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+            const durationDays = [...source.matchAll(/\b(\d+)(d|w|m)\b/gi)].reduce((sum, match) => {
+              const amount = Number(match[1]);
+              return sum + amount * ({ d: 1, w: 7, m: 30 }[match[2].toLowerCase()]);
+            }, 0);
+            if (dates.length < 2 && !durationDays) return 1800;
+            const spanDays = Math.max(
+              dates.length > 1 ? Math.ceil((Math.max(...dates) - Math.min(...dates)) / 86400000) + 1 : 0,
+              durationDays
+            );
+            return Math.min(12000, Math.max(1200, spanDays * 82 + 360));
+          };
           const diagrams = [...article.querySelectorAll(".mermaid")];
-          diagrams.forEach((diagram) => {
+          for (const diagram of diagrams) {
             diagram.removeAttribute("data-processed");
             const source = diagram.dataset.mermaidSource || diagram.textContent;
-            diagram.classList.toggle("mermaid-gantt", /^\s*gantt\b/i.test(source));
+            const isGantt = /^\s*gantt\b/i.test(source);
+            diagram.classList.toggle("mermaid-gantt", isGantt);
             diagram.textContent = source;
-          });
-          await mermaid.run({ nodes: diagrams });
+            mermaid.initialize({
+              startOnLoad: false,
+              securityLevel: "strict",
+              theme: "base",
+              themeVariables: palette,
+              gantt: {
+                tickInterval: "1day",
+                axisFormat: "%Y-%m-%d",
+                useWidth: isGantt ? estimateGanttWidth(source) : 1800
+              }
+            });
+            await mermaid.run({ nodes: [diagram] });
+          }
         });
         return renderQueue;
       };
