@@ -57,7 +57,8 @@ async function getPublishedIssues() {
     if (batch.length < 100) break;
   }
 
-  return results.flatMap((issue) => {
+  const issueMap = new Map(results.map((issue) => [issue.number, issue]));
+  const published = results.flatMap((issue) => {
     const labels = (issue.labels ?? []).map((label) => label.name);
     if (!labels.includes('publish') || labels.some((label) => /^(draft|private|no-publish)$/i.test(label))) return [];
     const tags = labels
@@ -72,7 +73,35 @@ async function getPublishedIssues() {
       body: issue.body ?? '',
       tags,
     }];
-  }).sort((a, b) => a.number - b.number);
+  });
+
+  // A published parent Issue may collect long-form sections in GitHub sub-issues.
+  // Fetch all pages and sort sections by creation time for deterministic assembly.
+  const subIssueNumbers = new Set();
+  for (const article of published) {
+    const response = await fetch(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${article.number}/sub_issues?per_page=100`,
+      { headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'beyond-errors-issue-publisher',
+      } },
+    );
+    if (!response.ok) throw new Error('GitHub API request failed');
+    const children = await response.json();
+    if (!Array.isArray(children)) throw new Error('Unexpected API response');
+    children.forEach((child) => subIssueNumbers.add(child.number));
+    children.sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at) || a.number - b.number);
+    article.body = [article.body, ...children.map((child) => {
+      const fullChild = issueMap.get(child.number) ?? child;
+      const section = (fullChild.body ?? '').trim();
+      return section ? `## ${fullChild.title ?? child.title}\n\n${section}` : '';
+    })].filter(Boolean).join('\n\n---\n\n');
+    article.subIssues = children.map((child) => ({ number: child.number, created_at: child.created_at, body: child.body ?? '' }));
+  }
+
+  return published.filter((article) => !subIssueNumbers.has(article.number)).sort((a, b) => a.number - b.number);
 }
 
 async function main() {

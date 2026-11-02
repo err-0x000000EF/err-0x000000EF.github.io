@@ -255,11 +255,21 @@ document.addEventListener("DOMContentLoaded", () => {
           cScale9: "#4f746d", cScaleLabel9: "#fffdf2", cScale10: "#80565e", cScaleLabel10: "#fffdf2",
           cScale11: "#6d784f", cScaleLabel11: "#fffdf2"
           };
-          mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base", themeVariables: palette });
+          mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: "strict",
+            theme: "base",
+            themeVariables: palette,
+            // Daily ticks collide on multi-week charts. Weekly ticks keep labels legible;
+            // the chart container remains horizontally scrollable for long timelines.
+            gantt: { tickInterval: "1week", axisFormat: "%b %d", useWidth: 1800 }
+          });
           const diagrams = [...article.querySelectorAll(".mermaid")];
           diagrams.forEach((diagram) => {
             diagram.removeAttribute("data-processed");
-            diagram.textContent = diagram.dataset.mermaidSource || diagram.textContent;
+            const source = diagram.dataset.mermaidSource || diagram.textContent;
+            diagram.classList.toggle("mermaid-gantt", /^\s*gantt\b/i.test(source));
+            diagram.textContent = source;
           });
           await mermaid.run({ nodes: diagrams });
         });
