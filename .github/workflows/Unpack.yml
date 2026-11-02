@@ -1,0 +1,120 @@
+name: Install Beyond errors Hugo template
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-hugo-template
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.BOOTSTRAP_TOKEN }}
+          persist-credentials: true
+
+      - name: Safely extract the uploaded template ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path, PurePosixPath
+          from zipfile import ZipFile
+          import shutil
+          import stat
+
+          root = Path.cwd().resolve()
+          archive = root / "beyond-errors-hugo-issue-blog.zip"
+          installer = root / ".github/workflows/unpack-template.yml"
+          expected_prefix = "beyond-errors-hugo-issue-blog"
+
+          if not archive.is_file():
+              raise SystemExit(
+                  "Upload beyond-errors-hugo-issue-blog.zip "
+                  "to the repository root first."
+              )
+
+          with ZipFile(archive) as package:
+              entries = package.infolist()
+
+              if not entries:
+                  raise SystemExit("The uploaded ZIP is empty.")
+
+              for entry in entries:
+                  name = PurePosixPath(entry.filename)
+
+                  if (
+                      name.is_absolute()
+                      or ".." in name.parts
+                      or not name.parts
+                      or name.parts[0] != expected_prefix
+                  ):
+                      raise SystemExit(
+                          "The ZIP does not have the expected template folder structure."
+                      )
+
+                  mode = entry.external_attr >> 16
+
+                  if stat.S_ISLNK(mode):
+                      raise SystemExit(
+                          "Symbolic links are not accepted in the template ZIP."
+                      )
+
+                  relative = Path(*name.parts[1:])
+
+                  if not relative.parts:
+                      continue
+
+                  destination = (root / relative).resolve()
+
+                  if destination != root and root not in destination.parents:
+                      raise SystemExit(
+                          "The ZIP contains a path outside the repository."
+                      )
+
+                  if entry.is_dir():
+                      destination.mkdir(parents=True, exist_ok=True)
+                  else:
+                      destination.parent.mkdir(parents=True, exist_ok=True)
+
+                      with package.open(entry) as source:
+                          with destination.open("wb") as target:
+                              shutil.copyfileobj(source, target)
+
+          if not (root / "hugo.toml").is_file():
+              raise SystemExit("hugo.toml was not found after extraction.")
+
+          if not (root / "themes/beyond-errors").is_dir():
+              raise SystemExit("The Hugo theme was not found after extraction.")
+
+          archive.unlink()
+          installer.unlink(missing_ok=True)
+          PY
+
+      - name: Commit the installed template
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No template files changed."
+            exit 0
+          fi
+
+          git commit -m "Install Beyond errors Hugo template"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
