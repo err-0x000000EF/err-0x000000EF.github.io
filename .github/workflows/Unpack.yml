@@ -33,7 +33,7 @@ jobs:
           import stat
 
           root = Path.cwd().resolve()
-          archive = root / "beyond-errors-hugo-issue-blog.zip"
+          archive = root / "Beyond-errors-Hugo-template.zip"
           installer = root / ".github/workflows/unpack-template.yml"
           expected_prefix = "beyond-errors-hugo-issue-blog"
 
